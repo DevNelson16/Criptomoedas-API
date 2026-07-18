@@ -1,0 +1,137 @@
+.container {
+  max-width: 1300px;
+  margin: 40px auto;
+  padding: 0 24px;
+}
+
+.form {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.form input {
+  flex: 1;
+  height: 52px;
+  padding: 0 18px;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  background: #1e293b;
+  color: #fff;
+  font-size: 15px;
+  transition: .25s;
+}
+
+.form input::placeholder {
+  color: #94a3b8;
+}
+
+.form input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, .15);
+}
+
+.form button {
+  height: 52px;
+  padding: 0 28px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #2563eb, #06b6d4);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: .3s;
+}
+
+.form button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(37, 99, 235, .35);
+}
+
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 12px;
+}
+
+thead tr {
+  background: #111827;
+}
+
+th {
+  color: #cbd5e1;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 18px;
+}
+
+.tr {
+  background: #1e293b;
+  transition: .25s;
+}
+
+.tr:hover {
+  background: #273549;
+  transform: scale(1.01);
+}
+
+td {
+  padding: 18px;
+  color: #fff;
+}
+
+td:first-child {
+  border-radius: 12px 0 0 12px;
+}
+
+td:last-child {
+  border-radius: 0 12px 12px 0;
+}
+
+.name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 600;
+}
+
+.logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  transition: .3s;
+}
+
+.logo:hover {
+  transform: rotate(10deg) scale(1.15);
+}
+
+.tdProfit {
+  color: #22c55e;
+  font-weight: 700;
+}
+
+.tdLoss {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.buttonMore {
+  display: block;
+  margin: 40px auto;
+  padding: 14px 34px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #2563eb, #06b6d4);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: .3s;
+}
+
+.buttonMore:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(37, 99, 235, .35);
+}
