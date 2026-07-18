@@ -1,4 +1,5 @@
-import { useState, FormEvent, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import type { FormEvent } from "react";
 import styles from "./home.module.css";
 import { BsSearch } from "react-icons/bs";
 import { Link, useNavigate } from "react-router-dom";
@@ -32,11 +33,7 @@ export function Home() {
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    getData();
-  }, [offset]);
-
-  async function getData() {
+  const getData = useCallback(async () => {
     fetch(`https://rest.coincap.io/v3/assets?limit=10&offset=${offset}`)
       .then((response) => response.json())
       .then((data: DataProps) => {
@@ -69,7 +66,11 @@ export function Home() {
         const listCoins = [...coins, ...formatedResults];
         setCoins(listCoins);
       });
-  }
+  }, [offset, coins]);
+
+  useEffect(() => {
+    getData();
+  }, [getData]);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -79,9 +80,9 @@ export function Home() {
   }
 
   function handleGetMore() {
-    if(offset === 0) {
+    if (offset === 0) {
       setOffset(10);
-      return
+      return;
     }
 
     setOffset(offset + 10);
@@ -95,6 +96,7 @@ export function Home() {
           placeholder="Digite o nome da moeda... EX bitcoin"
           onChange={(e) => setInput(e.target.value)}
         />
+
         <button type="submit">
           <BsSearch size={30} color="#FFF" />
         </button>
@@ -115,13 +117,14 @@ export function Home() {
           {coins.length > 0 &&
             coins.map((item) => (
               <tr className={styles.tr} key={item.id}>
-
                 <td className={styles.tdLabel} data-label="Moeda">
                   <div className={styles.name}>
-                    <img 
-                    className={styles.logo}
-                    src={`https://assets.coincap.io/assets/icons/${item.symbol.toLowerCase()}@2x.png`} 
-                    alt="Logo Criptomoeda"/>
+                    <img
+                      className={styles.logo}
+                      src={`https://assets.coincap.io/assets/icons/${item.symbol.toLowerCase()}@2x.png`}
+                      alt="Logo Criptomoeda"
+                    />
+
                     <Link to={`/detail/${item.id}`}>
                       <span>{item.name}</span> | {item.symbol}
                     </Link>
@@ -140,7 +143,14 @@ export function Home() {
                   {item.formatedVolume}
                 </td>
 
-                <td className={Number(item.changePercent24Hr) >= 0 ? styles.tdProfit : styles.tdLoss} data-label="Mudança 24h">
+                <td
+                  className={
+                    Number(item.changePercent24Hr) >= 0
+                      ? styles.tdProfit
+                      : styles.tdLoss
+                  }
+                  data-label="Mudança 24h"
+                >
                   <span>{Number(item.changePercent24Hr).toFixed(3)}%</span>
                 </td>
               </tr>
