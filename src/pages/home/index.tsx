@@ -1,72 +1,105 @@
 import { useState, useEffect, useCallback } from "react";
 import type { FormEvent } from "react";
+
 import styles from "./home.module.css";
+
 import { BsSearch } from "react-icons/bs";
 import { Link, useNavigate } from "react-router-dom";
+
+interface CoinQuote {
+  price: number;
+  market_cap: number;
+  volume_24h: number;
+  percent_change_24h: number;
+}
 
 export interface CoinProps {
   id: string;
   name: string;
   symbol: string;
-  priceUsd: string;
-  vwap24Hr: string;
-  changePercent24Hr: string;
-  rank: string;
-  supply: string;
-  maxSupply: string;
-  marketCapUsd: string;
-  volumeUsd24Hr: string;
-  explorer: string;
+  rank: number;
+  total_supply: number | null;
+  max_supply: number | null;
+  quotes: {
+    USD: CoinQuote;
+  };
   formatedPrice?: string;
   formatedMarket?: string;
   formatedVolume?: string;
-}
-
-interface DataProps {
-  data: CoinProps[];
 }
 
 export function Home() {
   const [input, setInput] = useState("");
   const [coins, setCoins] = useState<CoinProps[]>([]);
   const [offset, setOffset] = useState(0);
+  const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
 
   const getData = useCallback(async () => {
-    fetch(`https://rest.coincap.io/v3/assets?limit=10&offset=${offset}`)
-      .then((response) => response.json())
-      .then((data: DataProps) => {
-        const coinsData = data.data;
+    try {
+      setLoading(true);
 
-        const price = Intl.NumberFormat("en-US", {
-          style: "currency",
-          currency: "USD",
-        });
+      const response = await fetch(
+        "https://api.coinpaprika.com/v1/tickers"
+      );
 
-        const priceCompact = Intl.NumberFormat("en-US", {
-          style: "currency",
-          currency: "USD",
-          notation: "compact",
-        });
+      if (!response.ok) {
+        throw new Error(`Erro da API: ${response.status}`);
+      }
 
-        const formatedResults = coinsData.map((item) => {
-          const formated = {
-            ...item,
-            formatedPrice: price.format(Number(item.priceUsd)),
-            formatedMarket: priceCompact.format(Number(item.marketCapUsd)),
-            formatedVolume: priceCompact.format(Number(item.volumeUsd24Hr)),
-          };
+      const data: CoinProps[] = await response.json();
 
-          return formated;
-        });
+      if (!Array.isArray(data)) {
+        throw new Error("A API não devolveu uma lista de criptomoedas.");
+      }
 
-        //console.log(formatedResults)
-
-        const listCoins = [...coins, ...formatedResults];
-        setCoins(listCoins);
+      const price = Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
       });
-  }, [offset, coins]);
+
+      const priceCompact = Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        notation: "compact",
+      });
+
+      const formatedResults = data
+        .filter((item) => item.quotes?.USD)
+        .sort((a, b) => a.rank - b.rank)
+        .slice(offset, offset + 10)
+        .map((item) => ({
+          ...item,
+          formatedPrice: price.format(item.quotes.USD.price),
+          formatedMarket: priceCompact.format(
+            item.quotes.USD.market_cap
+          ),
+          formatedVolume: priceCompact.format(
+            item.quotes.USD.volume_24h
+          ),
+        }));
+
+      setCoins((previousCoins) => {
+        const existingIds = new Set(
+          previousCoins.map((coin) => coin.id)
+        );
+
+        const newCoins = formatedResults.filter(
+          (coin) => !existingIds.has(coin.id)
+        );
+
+        return [...previousCoins, ...newCoins];
+      });
+    } catch (error) {
+      console.error(
+        "Não foi possível carregar as criptomoedas:",
+        error
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [offset]);
 
   useEffect(() => {
     getData();
@@ -75,17 +108,13 @@ export function Home() {
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
-    if (input === "") return;
-    navigate(`/detail/${input}`);
+    if (input.trim() === "") return;
+
+    navigate(`/detail/${input.trim().toLowerCase()}`);
   }
 
   function handleGetMore() {
-    if (offset === 0) {
-      setOffset(10);
-      return;
-    }
-
-    setOffset(offset + 10);
+    setOffset((previousOffset) => previousOffset + 10);
   }
 
   return (
@@ -94,6 +123,7 @@ export function Home() {
         <input
           type="text"
           placeholder="Digite o nome da moeda... EX bitcoin"
+          value={input}
           onChange={(e) => setInput(e.target.value)}
         />
 
@@ -114,52 +144,69 @@ export function Home() {
         </thead>
 
         <tbody id="tbody">
-          {coins.length > 0 &&
-            coins.map((item) => (
-              <tr className={styles.tr} key={item.id}>
-                <td className={styles.tdLabel} data-label="Moeda">
-                  <div className={styles.name}>
-                    <img
-                      className={styles.logo}
-                      src={`https://assets.coincap.io/assets/icons/${item.symbol.toLowerCase()}@2x.png`}
-                      alt="Logo Criptomoeda"
-                    />
+          {coins.map((item) => (
+            <tr className={styles.tr} key={item.id}>
+              <td
+                className={styles.tdLabel}
+                data-label="Moeda"
+              >
+                <div className={styles.name}>
+                  <img
+                    className={styles.logo}
+                    src={`https://assets.coincap.io/assets/icons/${item.symbol.toLowerCase()}@2x.png`}
+                    alt={`Logo ${item.name}`}
+                  />
 
-                    <Link to={`/detail/${item.id}`}>
-                      <span>{item.name}</span> | {item.symbol}
-                    </Link>
-                  </div>
-                </td>
+                  <Link to={`/detail/${item.id}`}>
+                    <span>{item.name}</span> | {item.symbol}
+                  </Link>
+                </div>
+              </td>
 
-                <td className={styles.tdLabel} data-label="Valor mercado">
-                  {item.formatedMarket}
-                </td>
+              <td
+                className={styles.tdLabel}
+                data-label="Valor mercado"
+              >
+                {item.formatedMarket}
+              </td>
 
-                <td className={styles.tdLabel} data-label="Preço">
-                  {item.formatedPrice}
-                </td>
+              <td
+                className={styles.tdLabel}
+                data-label="Preço"
+              >
+                {item.formatedPrice}
+              </td>
 
-                <td className={styles.tdLabel} data-label="Volume">
-                  {item.formatedVolume}
-                </td>
+              <td
+                className={styles.tdLabel}
+                data-label="Volume"
+              >
+                {item.formatedVolume}
+              </td>
 
-                <td
-                  className={
-                    Number(item.changePercent24Hr) >= 0
-                      ? styles.tdProfit
-                      : styles.tdLoss
-                  }
-                  data-label="Mudança 24h"
-                >
-                  <span>{Number(item.changePercent24Hr).toFixed(3)}%</span>
-                </td>
-              </tr>
-            ))}
+              <td
+                className={
+                  item.quotes.USD.percent_change_24h >= 0
+                    ? styles.tdProfit
+                    : styles.tdLoss
+                }
+                data-label="Mudança 24h"
+              >
+                <span>
+                  {item.quotes.USD.percent_change_24h.toFixed(3)}%
+                </span>
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
 
-      <button className={styles.buttonMore} onClick={handleGetMore}>
-        Carregar mais...
+      <button
+        className={styles.buttonMore}
+        onClick={handleGetMore}
+        disabled={loading}
+      >
+        {loading ? "A carregar..." : "Carregar mais..."}
       </button>
     </main>
   );
