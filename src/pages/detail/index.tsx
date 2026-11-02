@@ -1,67 +1,88 @@
 import { useEffect, useState } from "react";
+
 import { useParams, useNavigate } from "react-router-dom";
+
 import { type CoinProps } from "../home";
+
 import styles from "./detail.module.css";
-
-interface ResponseData {
-  data: CoinProps;
-}
-
-interface ErrorData {
-  error: string;
-}
-
-type DataProps = ResponseData | ErrorData;
 
 export function Detail() {
   const { cripto } = useParams();
+
   const navigate = useNavigate();
 
   const [coin, setCoin] = useState<CoinProps>();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
+
     async function getCoin() {
       try {
-        fetch(`https://rest.coincap.io/v3/assets/${cripto}`)
-          .then((response) => response.json())
-          .then((data: DataProps) => {
-            if ("error" in data) {
-              navigate("/");
-              return;
-            }
+        const response = await fetch(
+          `https://api.coinpaprika.com/v1/tickers/${cripto}`,
+          {
+            signal: controller.signal,
+          }
+        );
 
-            const price = Intl.NumberFormat("en-US", {
-              style: "currency",
-              currency: "USD",
-            });
+        if (!response.ok) {
+          throw new Error("Criptomoeda não encontrada.");
+        }
 
-            const priceCompact = Intl.NumberFormat("en-US", {
-              style: "currency",
-              currency: "USD",
-              notation: "compact",
-            });
+        const data: CoinProps = await response.json();
 
-            const resultData = {
-              ...data.data,
-              formatedPrice: price.format(Number(data.data.priceUsd)),
-              formatedMarket: priceCompact.format(
-                Number(data.data.marketCapUsd),
-              ),
-              formatedVolume: priceCompact.format(
-                Number(data.data.volumeUsd24Hr),
-              ),
-            };
+        if (!data?.quotes?.USD) {
+          throw new Error("Dados da criptomoeda indisponíveis.");
+        }
 
-            setCoin(resultData);
-            setLoading(false);
-          });
+        const price = Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: "USD",
+        });
+
+        const priceCompact = Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: "USD",
+          notation: "compact",
+        });
+
+        const resultData: CoinProps = {
+          ...data,
+          formatedPrice: price.format(data.quotes.USD.price),
+          formatedMarket: priceCompact.format(
+            data.quotes.USD.market_cap
+          ),
+          formatedVolume: priceCompact.format(
+            data.quotes.USD.volume_24h
+          ),
+        };
+
+        if (!controller.signal.aborted) {
+          setCoin(resultData);
+        }
       } catch (error) {
-        console.log(error);
-        navigate("/");
+        if (error instanceof Error && error.name === "AbortError") {
+          return;
+        }
+
+        console.error("Erro ao carregar os detalhes:", error);
+
+        if (!controller.signal.aborted) {
+          navigate("/");
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     }
+
     getCoin();
+
+    return () => {
+      controller.abort();
+    };
   }, [cripto, navigate]);
 
   if (loading || !coin) {
@@ -74,42 +95,47 @@ export function Detail() {
 
   return (
     <div className={styles.container}>
-      <h1 className={styles.center}>{coin?.name}</h1>
-      <h1 className={styles.center}>{coin?.symbol}</h1>
+      <h1 className={styles.center}>{coin.name}</h1>
+
+      <h1 className={styles.center}>{coin.symbol}</h1>
 
       <section className={styles.content}>
         <img
-          src={`https://assets.coincap.io/assets/icons/${coin?.symbol.toLowerCase()}@2x.png`}
-          alt="Logo da moeda"
+          src={`https://assets.coincap.io/assets/icons/${coin.symbol.toLowerCase()}@2x.png`}
+          alt={`Logo ${coin.name}`}
           className={styles.logo}
         />
+
         <h1>
-          {coin?.name} | {coin?.symbol}
+          {coin.name} | {coin.symbol}
         </h1>
 
         <p>
           <strong>Preço: </strong>
-          {coin?.formatedPrice}
+          {coin.formatedPrice}
         </p>
 
         <a>
           <strong>Mercado: </strong>
-          {coin?.formatedMarket}
+          {coin.formatedMarket}
         </a>
 
         <a>
           <strong>Volume: </strong>
-          {coin?.formatedVolume}
+          {coin.formatedVolume}
         </a>
 
         <a>
           <strong>Mudança 24h: </strong>
+
           <span
             className={
-              Number(coin?.changePercent24Hr) > 0 ? styles.profit : styles.loss
+              coin.quotes.USD.percent_change_24h > 0
+                ? styles.profit
+                : styles.loss
             }
           >
-            {Number(coin?.changePercent24Hr).toFixed(3)}
+            {coin.quotes.USD.percent_change_24h.toFixed(3)}%
           </span>
         </a>
       </section>
