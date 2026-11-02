@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import type { FormEvent } from "react";
 
 import styles from "./home.module.css";
@@ -32,78 +32,95 @@ export function Home() {
   const [input, setInput] = useState("");
   const [coins, setCoins] = useState<CoinProps[]>([]);
   const [offset, setOffset] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const navigate = useNavigate();
 
-  const getData = useCallback(async () => {
-    try {
-      setLoading(true);
-
-      const response = await fetch(
-        "https://api.coinpaprika.com/v1/tickers"
-      );
-
-      if (!response.ok) {
-        throw new Error(`Erro da API: ${response.status}`);
-      }
-
-      const data: CoinProps[] = await response.json();
-
-      if (!Array.isArray(data)) {
-        throw new Error("A API não devolveu uma lista de criptomoedas.");
-      }
-
-      const price = Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-      });
-
-      const priceCompact = Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        notation: "compact",
-      });
-
-      const formatedResults = data
-        .filter((item) => item.quotes?.USD)
-        .sort((a, b) => a.rank - b.rank)
-        .slice(offset, offset + 10)
-        .map((item) => ({
-          ...item,
-          formatedPrice: price.format(item.quotes.USD.price),
-          formatedMarket: priceCompact.format(
-            item.quotes.USD.market_cap
-          ),
-          formatedVolume: priceCompact.format(
-            item.quotes.USD.volume_24h
-          ),
-        }));
-
-      setCoins((previousCoins) => {
-        const existingIds = new Set(
-          previousCoins.map((coin) => coin.id)
-        );
-
-        const newCoins = formatedResults.filter(
-          (coin) => !existingIds.has(coin.id)
-        );
-
-        return [...previousCoins, ...newCoins];
-      });
-    } catch (error) {
-      console.error(
-        "Não foi possível carregar as criptomoedas:",
-        error
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [offset]);
-
   useEffect(() => {
-    getData();
-  }, [getData]);
+    const controller = new AbortController();
+
+    async function loadData() {
+      try {
+        const response = await fetch(
+          "https://api.coinpaprika.com/v1/tickers",
+          {
+            signal: controller.signal,
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Erro da API: ${response.status}`);
+        }
+
+        const data: CoinProps[] = await response.json();
+
+        if (!Array.isArray(data)) {
+          throw new Error(
+            "A API não devolveu uma lista de criptomoedas."
+          );
+        }
+
+        const price = Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: "USD",
+        });
+
+        const priceCompact = Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: "USD",
+          notation: "compact",
+        });
+
+        const formatedResults = data
+          .filter((item) => item.quotes?.USD)
+          .sort((a, b) => a.rank - b.rank)
+          .slice(offset, offset + 10)
+          .map((item) => ({
+            ...item,
+            formatedPrice: price.format(item.quotes.USD.price),
+            formatedMarket: priceCompact.format(
+              item.quotes.USD.market_cap
+            ),
+            formatedVolume: priceCompact.format(
+              item.quotes.USD.volume_24h
+            ),
+          }));
+
+        if (!controller.signal.aborted) {
+          setCoins((previousCoins) => {
+            const existingIds = new Set(
+              previousCoins.map((coin) => coin.id)
+            );
+
+            const newCoins = formatedResults.filter(
+              (coin) => !existingIds.has(coin.id)
+            );
+
+            return [...previousCoins, ...newCoins];
+          });
+
+          setLoading(false);
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          return;
+        }
+
+        console.error(
+          "Não foi possível carregar as criptomoedas:",
+          error
+        );
+
+        setLoading(false);
+      }
+    }
+
+    loadData();
+
+    return () => {
+      controller.abort();
+    };
+  }, [offset]);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -114,6 +131,7 @@ export function Home() {
   }
 
   function handleGetMore() {
+    setLoading(true);
     setOffset((previousOffset) => previousOffset + 10);
   }
 
